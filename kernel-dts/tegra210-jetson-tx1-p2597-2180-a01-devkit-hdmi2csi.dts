@@ -1,0 +1,370 @@
+/*
+ * arch/arm64/boot/dts/tegra210-jetson-tx1-p2597-2180-a01-devkit.dts
+ *
+ * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ */
+
+#include "tegra210-jetson-cv-base-p2597-2180-a00.dts"
+
+/ {
+	model = "jetson_tx1";
+	compatible = "nvidia,jetson-cv", "nvidia,tegra210";
+	nvidia,dtsfilename = __FILE__;
+
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	chosen {
+		bootloader {
+			nvidia,skip-display-init;
+		};
+	};
+
+	host1x {
+		dc@54200000 {
+			status = "disabled";
+		};
+
+		dsi {
+			status = "disabled";
+			panel-a-wuxga-8-0 {
+				status = "disabled";
+			};
+			panel-s-wqxga-10-1 {
+				status = "disabled";
+			};
+		};
+
+		sor {
+			panel-s-edp-uhdtv-15-6 {
+				status = "disabled";
+			};
+			prod-settings {
+				status = "disabled";
+			};
+		};
+	};
+
+	i2c@7000c400 {
+		lp8557-backlight-a-wuxga-8-0@2c {
+			status = "disabled";
+		};
+	};
+
+	pinmux@700008d4 {
+		common {
+			/*
+			 * Pull down the INT pin of the TC358840 (HDMI IN A) while
+			 * in reset in order to set i2c address 0x0F.
+			 */
+			cam1_pwdn_ps7 {
+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+
+			/*
+			 * Pull up the INT pin of the TC358840 (HDMI IN B) while
+			 * in reset in order to set i2c address 0x1F.
+			 */
+			cam2_pwdn_pt0 {
+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+				nvidia,pull = <TEGRA_PIN_PULL_UP>;
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+		};
+	};
+
+	/*
+	 * Delete device-tree entries by Nvidia for camera hardware that is not
+	 * available on the HDMI2CSI hardware and not supported by tegra_vi2
+	 */
+	/delete-node/ plugin-manager;
+	i2c@7000c000 {
+		/delete-node/ ov23850_c@36;
+		/delete-node/ lc898212@72;
+	};
+	/delete-node/ tegra-camera-platform;
+	aliases {
+		/delete-property/ gpio288;
+	};
+	host1x {
+		// /delete-node/ vi;
+		vi {
+			/delete-node/ ports;
+		};
+		/delete-node/ nvcsi;
+		/delete-node/ i2c@546c0000;
+	};
+	/* en_vdd_vcm_2v8: Conflict with CAM0_RST_L */
+	regulators {
+		/delete-node/ regulator@210;
+	};
+	gpio: gpio@6000d000 {
+		/delete-node/ camera-control-output-low;
+	};
+
+	host1x {
+		i2c7: i2c@546c0000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "nvidia,tegra210-vii2c";
+			reg = <0x0 0x546C0000 0x0 0x00034000>;
+			iommus = <&smmu TEGRA_SWGROUP_VII2C>;
+			interrupts = <0 17 0x04>;
+			scl-gpio = <&gpio TEGRA_GPIO(S, 2) 0>;
+			sda-gpio = <&gpio TEGRA_GPIO(S, 3) 0>;
+			clocks = <&tegra_car TEGRA210_CLK_VI_I2C>,
+				<&tegra_car TEGRA210_CLK_I2CSLOW>,
+				<&tegra_car TEGRA210_CLK_HOST1X>;
+			clock-names = "vii2c", "i2cslow", "host1x";
+			resets = <&tegra_car 208>;
+			reset-names = "vii2c";
+			clock-frequency = <400000>;
+
+			status = "okay";
+			bus-pullup-supply = <&max77620_sd3>;
+			avdd_dsi_csi-supply = <&max77620_ldo0>;
+
+
+			/* HDMI IN A (4K) */
+			tc358840@0f {
+				compatible = "toshiba,tc358840";
+				reg = <0x0f>;
+				status = "okay";
+				devnode = "video0";
+
+				/* Power Supply */
+				vdig-supply = <&en_vdd_cam_1v2>;
+				vif-supply = <&en_vdd_cam>;
+
+				/* Reset */
+				reset-gpios = <&gpio CAM0_RST_L GPIO_ACTIVE_LOW>;
+
+				/* Interrupt */
+				interrupt-parent = <&gpio>;
+				interrupts = <CAM0_PWDN IRQ_TYPE_LEVEL_HIGH>;
+
+				refclk_hz = <48000000>; /* 40 - 50 MHz */
+
+				ddc5v_delay = <1>;		/* 50 ms */
+
+				/* HDCP */
+				/* TODO: Not yet implemented */
+				enable_hdcp = <0>;
+
+				/* CSI Output */
+				/* Enable TX0 (4 lanes) & TX1 (4 lanes) */
+				csi_port = <3>;
+				/* FIXME: DEBUG */
+				// csi_port = <1>;
+
+				lineinitcnt = <0x00000FA0>;
+				lptxtimecnt = <0x00000004>;
+				tclk_headercnt = <0x00180203>;
+				tclk_trailcnt = <0x00040005>;
+				ths_headercnt = <0x000D0004>;
+				twakeup = <0x00003E80>;
+				tclk_postcnt = <0x0000000A>;
+				ths_trailcnt = <0x00080006>;
+				hstxvregcnt = <0x00000020>;
+
+				/* PLL */
+				/* Bps per lane is (refclk_hz / pll_prd) * pll_fbd */
+				pll_prd = <10>;
+				pll_fbd = <125>;
+
+				port@0 {
+					ret = <0>;
+					hdmi2csi_tc358840_out0: endpoint {
+						csi-port = <0>;
+						bus-width = <8>;
+						remote-endpoint = <&hdmi2csi_csi_in0>;
+					};
+				};
+			};
+
+			/* HDMI IN B (Full HD) */
+			tc358840@1f {
+				compatible = "toshiba,tc358840";
+				reg = <0x1f>;
+				status = "okay";
+				devnode = "video1";
+
+				/* Power Supply */
+				vdig-supply = <&en_vdd_cam_1v2>;
+				vif-supply = <&en_vdd_cam>;
+
+				/* Reset */
+				reset-gpios = <&gpio CAM1_RST_L GPIO_ACTIVE_LOW>;
+
+				/* Interrupt */
+				interrupt-parent = <&gpio>;
+				interrupts = <CAM1_PWDN IRQ_TYPE_LEVEL_HIGH>;
+
+				refclk_hz = <48000000>; /* 40 - 50 MHz */
+
+				ddc5v_delay = <1>;	/* 50 ms */
+
+				/* HDCP */
+				/* TODO: Not yet implemented */
+				enable_hdcp = <0>;
+
+				/* CSI Output */
+				csi_port = <1>;		/* Enable TX0 only */
+
+				lineinitcnt = <0x00000FA0>;
+				lptxtimecnt = <0x00000004>;
+				tclk_headercnt = <0x00180203>;
+				tclk_trailcnt = <0x00040005>;
+				ths_headercnt = <0x000D0004>;
+				twakeup = <0x00003E80>;
+				tclk_postcnt = <0x0000000A>;
+				ths_trailcnt = <0x00080006>;
+				hstxvregcnt = <0x00000020>;
+
+				/* PLL */
+				/* Bps per lane is (refclk_hz / pll_prd) * pll_fbd */
+				pll_prd = <10>;
+				pll_fbd = <125>;
+
+				port@0 {
+					ret = <0>;
+					hdmi2csi_tc358840_out1: endpoint {
+						csi-port = <4>;
+						bus-width = <4>;
+						remote-endpoint = <&hdmi2csi_csi_in1>;
+					};
+				};
+			};
+		};
+	};
+
+	host1x {
+		vi {
+			num-channels = <2>;
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				port@0 {
+					reg = <0>;
+					hdmi2csi_vi_in0: endpoint {
+						csi-port = <0>;
+						bus-width = <8>;
+						remote-endpoint = <&hdmi2csi_csi_out0>;
+					};
+				};
+				port@1 {
+					reg = <1>;
+					hdmi2csi_vi_in1: endpoint {
+						csi-port = <4>;
+						bus-width = <4>;
+						remote-endpoint = <&hdmi2csi_csi_out1>;
+					};
+				};
+			};
+		};
+
+		nvcsi {
+			num-channels = <2>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			channel@0 {
+				reg = <0>;
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						hdmi2csi_csi_in0: endpoint@0 {
+							csi-port = <0>;
+							bus-width = <8>;
+							remote-endpoint = <&hdmi2csi_tc358840_out0>;
+						};
+					};
+					port@1 {
+						reg = <1>;
+						hdmi2csi_csi_out0: endpoint@1 {
+							remote-endpoint = <&hdmi2csi_vi_in0>;
+						};
+					};
+				};
+			};
+			channel@1 {
+				reg = <1>;
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						hdmi2csi_csi_in1: endpoint@2 {
+							csi-port = <4>;
+							bus-width = <4>;
+							remote-endpoint = <&hdmi2csi_tc358840_out1>;
+						};
+					};
+					port@1 {
+						reg = <1>;
+						hdmi2csi_csi_out1: endpoint@3 {
+							remote-endpoint = <&hdmi2csi_vi_in1>;
+						};
+					};
+				};
+			};
+		};
+	};
+
+	regulators {
+		/*** Enable power supply for HDMI extension board ***/
+		/* VDD_SYS_EN */
+		en_vdd_cam: regulator@5 {
+			regulator-boot-on;
+			regulator-always-on;
+		};
+
+		/* CAM_VDD_1V8_EN */
+		en_vdd_cam_1v8: regulator@211 {
+			regulator-boot-on;
+			regulator-always-on;
+		};
+
+		/* CAM_VDD_1V2_EN */
+		en_vdd_cam_1v2: regulator@209 {
+			regulator-boot-on;
+			regulator-always-on;
+		};
+	};
+
+	backlight {
+		status = "disabled";
+		panel-a-wuxga-8-0-bl {
+			status = "disabled";
+		};
+		panel-s-edp-uhdtv-15-6-bl {
+			status = "disabled";
+		};
+	};
+
+	sor {
+		status = "disabled";
+		prod-settings {
+			status = "disabled";
+		};
+		panel-s-edp-uhdtv-15-6 {
+			smartdimmer {
+				status = "disabled";
+			};
+		};
+	};
+};
+
