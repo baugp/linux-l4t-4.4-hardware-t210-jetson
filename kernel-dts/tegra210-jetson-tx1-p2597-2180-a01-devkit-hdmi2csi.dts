@@ -324,6 +324,82 @@
 		};
 	};
 
+	tegra-camera-platform {
+		compatible = "nvidia, tegra-camera-platform";
+		/**
+		* Physical settings to calculate max ISO BW
+		*
+		* num_csi_lanes = <>;
+		* Total number of CSI lanes when all cameras are active
+		*
+		* max_lane_speed = <>;
+		* Max lane speed in Kbit/s
+		*
+		* min_bits_per_pixel = <>;
+		* Min bits per pixel
+		*
+		* vi_peak_byte_per_pixel = <>;
+		* Max byte per pixel for the VI ISO case
+		*
+		* vi_bw_margin_pct = <>;
+		* Vi bandwidth margin in percentage
+		*
+		* max_pixel_rate = <>;
+		* Max pixel rate in Kpixel/s for the ISP ISO case
+		*
+		* isp_peak_byte_per_pixel = <>;
+		* Max byte per pixel for the ISP ISO case
+		*
+		* isp_bw_margin_pct = <>;
+		* Isp bandwidth margin in percentage
+		*/
+		num_csi_lanes = <12>;
+		max_lane_speed = <1500000>;
+		min_bits_per_pixel = <16>;
+		vi_peak_byte_per_pixel = <3>;
+		vi_bw_margin_pct = <25>;
+		// max_pixel_rate = <0>;
+		isp_peak_byte_per_pixel = <3>;
+		isp_bw_margin_pct = <25>;
+
+		/**
+		* The general guideline for naming badge_info contains 3 parts, and is as follows,
+		* The first part is the camera_board_id for the module; if the module is in a FFD
+		* platform, then use the platform name for this part.
+		* The second part contains the position of the module, ex. “rear” or “front”.
+		* The third part contains the last 6 characters of a part number which is found
+		* in the module's specsheet from the vender.
+		*/
+		modules {
+			module0 {
+				badge = "hdmi2csi_left_358840";
+				position = "left";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "tc358840 6-000f";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/host1x/i2c@546c0000/tc358840@0f";
+				};
+			};
+			module1 {
+				badge = "hdmi2csi_right_358840";
+				position = "right";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "ov23850 6-001f";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/host1x/i2c@546c0000/tc358840@1f";
+				};
+			};
+		};
+	};
+
 	regulators {
 		/*** Enable power supply for HDMI extension board ***/
 		/* VDD_SYS_EN */
